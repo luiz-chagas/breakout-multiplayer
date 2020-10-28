@@ -1,17 +1,45 @@
-import express from "express";
-import { createGame } from "./services/game";
+import io from "socket.io";
+import http from "http";
+import { app } from "./express";
+import { makeSocketServer } from "./services/socket";
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+const port = process.env.PORT || 3000;
+app.set("port", port);
 
-app.listen(PORT, () => {
-  console.log("Listening on port " + PORT);
+const server = http.createServer(app);
+const socketServer = io(server, {
+  transports: ["websocket"],
 });
 
-const game = createGame({
-  radius: 1,
-  velocityX: 0,
-  velocityY: -10,
-  x: 50,
-  y: 99,
-});
+makeSocketServer(socketServer);
+
+const onError = (error: any) => {
+  if (error.syscall !== "listen") {
+    throw error;
+  }
+
+  const bind = typeof port === "string" ? "Pipe " + port : "Port " + port;
+
+  switch (error.code) {
+    case "EACCES":
+      console.error(bind + " requires elevated privileges");
+      process.exit(1);
+      break;
+    case "EADDRINUSE":
+      console.error(bind + " is already in use");
+      process.exit(1);
+      break;
+    default:
+      throw error;
+  }
+};
+
+const onListening = () => {
+  const addr = server.address();
+  const bind = typeof addr === "string" ? "pipe " + addr : "port " + addr?.port;
+  console.log(`Listening on ${bind}`);
+};
+
+server.listen(port);
+server.on("error", onError);
+server.on("listening", onListening);
